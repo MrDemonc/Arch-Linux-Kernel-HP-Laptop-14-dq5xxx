@@ -1,3 +1,35 @@
-/*.old
-/*.orig
-/*.rej
+# Arch Linux tarballs and patches
+*.tar.xz
+*.tar.gz
+*.tar.zst
+*.patch
+*.patch.zst
+*.sign
+*.sig
+
+# Compiled packages
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.pkg.tar
+
+# Build directories
+pkg/
+src/
+
+# Temporary and local configuration files
+.use_localmodconfig
+.github_repo
+*.log
+*.old
+*.orig
+*.rej
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Editor & OS files
+.DS_Store
+*.swp
+*.swo
+*~

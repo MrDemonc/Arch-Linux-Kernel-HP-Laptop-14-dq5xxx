@@ -1,9 +1,9 @@
 # Maintainer: Jan Alexander Steffens (heftig) <heftig@archlinux.org>
 
-pkgbase=linux
+pkgbase=linux-hp
 pkgver=7.1.10.arch1
 pkgrel=1
-pkgdesc='Linux'
+pkgdesc='Linux kernel tailored and optimized for HP Laptop (Alder Lake, Battery & Power Saving)'
 url='https://github.com/archlinux/linux'
 arch=(
   x86_64
@@ -21,21 +21,11 @@ makedepends=(
   pahole
   perl
   python
-  rust
-  rust-bindgen
-  rust-src
   tar
   xxhash
   xz
   zlib
   zstd
-
-  # htmldocs
-  graphviz
-  imagemagick
-  python-sphinx
-  python-yaml
-  texlive-latexextra
 )
 options=(
   !debug
@@ -44,26 +34,13 @@ options=(
 _srcname=linux-${pkgver%.*}
 _srctag=v${pkgver%.*}-${pkgver##*.}
 source=(
-  https://cdn.kernel.org/pub/linux/kernel/v${pkgver%%.*}.x/${_srcname}.tar.{xz,sign}
-  $url/releases/download/$_srctag/linux-$_srctag.patch.zst{,.sig}
+  https://cdn.kernel.org/pub/linux/kernel/v${pkgver%%.*}.x/${_srcname}.tar.xz
+  $url/releases/download/$_srctag/linux-$_srctag.patch.zst
 )
 source_x86_64=(config.x86_64)
-validpgpkeys=(
-  ABAF11C65A2970B130ABE3C479BE3E4300411886  # Linus Torvalds
-  647F28654894E3BD457199BE38DBBDC86092693E  # Greg Kroah-Hartman
-  83BC8889351B5DEBBB68416EB8AC08600F108CDF  # Jan Alexander Steffens (heftig)
-)
 b2sums=('fd433e456a207ba881c085d9743dcee706cadc9eed577bb5893419569cc10e494607116fd1bede2bda5c35d9ef76d32e3160473d5d9e7ea378de248a296914dd'
-        'SKIP'
-        '93e99c1e404d59ddf801d416facfb0f471b7284c55e362d481cb0df9d360bf10b214b4b609c683b2f0832efb6140c8c3849a37b36a8904ce452e96687bd75c6f'
-        'SKIP')
-b2sums_x86_64=('e5a79d3120d8eaa784ba65892f92da11fc21f33e9bc33aaa256f3a9ba58d9fd2c6781e475f0210368191ddafb1fcaab2aa68764d6503c3b7bed05906c4b8d105')
-
-# https://www.kernel.org/pub/linux/kernel/v7.x/sha256sums.asc
-sha256sums=('67d2f4697a02f3bec98e744b1bdc307e920c24bb4e88b5ee97dc9a34e9aa9999'
-            'SKIP'
-            'fbd5815ca26d02fe65bdeacad71b22eaa9cb0ddd02b13b6637b94b5d02fd325f'
-            'SKIP')
+        '93e99c1e404d59ddf801d416facfb0f471b7284c55e362d481cb0df9d360bf10b214b4b609c683b2f0832efb6140c8c3849a37b36a8904ce452e96687bd75c6f')
+b2sums_x86_64=('5aed7c29930f90a7142725a97052e6ed615e88fed363a9f04743e5e14b7e8c066abd7e4023aac7357e945d83b5dd4ac3632b938593d2f05e86efb5b6da5a7198')
 
 export KBUILD_BUILD_HOST=archlinux
 export KBUILD_BUILD_USER=$pkgbase
@@ -88,6 +65,10 @@ prepare() {
 
   echo "Setting config..."
   cp ../config.$CARCH .config
+  if [[ -f ../.use_localmodconfig || "${USE_LOCALMODCONFIG:-0}" == "1" ]]; then
+    echo "Applying localmodconfig (streamlining for HP laptop hardware)..."
+    yes "" | make LSMOD=<(lsmod) localmodconfig
+  fi
   make olddefconfig
   diff -u ../config.$CARCH .config || :
 
@@ -98,12 +79,8 @@ prepare() {
 build() {
   cd $_srcname
 
-  make htmldocs SPHINXOPTS=-QT &
-  local pid_docs=$!
-
   make all
   make -C tools/bpf/bpftool vmlinux.h feature-clang-bpf-co-re=1
-  wait $pid_docs
 }
 
 _package() {
@@ -261,32 +238,9 @@ _package-headers() {
   ln -sr "$builddir" "$pkgdir/usr/src/$pkgbase"
 }
 
-_package-docs() {
-  pkgdesc="Documentation for the $pkgdesc kernel"
-
-  cd $_srcname
-  local builddir="$pkgdir/usr/lib/modules/$(<version)/build"
-
-  echo "Installing documentation..."
-  local src dst
-  while read -rd '' src; do
-    dst="${src#Documentation/}"
-    dst="$builddir/Documentation/${dst#output/}"
-    install -Dm644 "$src" "$dst"
-  done < <(
-    find Documentation \( -name '.*' -o -name __pycache__ \) -prune \
-      -o \! -type d -print0
-  )
-
-  echo "Adding symlink..."
-  mkdir -p "$pkgdir/usr/share/doc"
-  ln -sr "$builddir/Documentation" "$pkgdir/usr/share/doc/$pkgbase"
-}
-
 pkgname=(
   "$pkgbase"
   "$pkgbase-headers"
-  "$pkgbase-docs"
 )
 for _p in "${pkgname[@]}"; do
   eval "package_$_p() {
