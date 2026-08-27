@@ -88,7 +88,11 @@ The interactive menu presents **3 options**:
 * Configures a lightweight `systemd` user timer (`~/.config/systemd/user/check-kernel-update.timer`).
 * Silently checks the official Arch Linux package API every 12 hours (and 5 minutes after system boot).
 * Sends a native desktop notification (`notify-send`) when a newer official kernel is released, reminding you to run `./install.sh`.
-* Includes an option to trigger a test notification.
+* Includes options to:
+  * **Install / Re-enable** the notification service (recreates all required files if missing).
+  * **Test** sending an instant desktop notification.
+  * **Disable** the timer temporarily.
+  * **Completely remove** all notifier scripts, systemd units, and state files from your system.
 
 ---
 
