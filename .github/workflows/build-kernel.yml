@@ -145,4 +145,5 @@ jobs:
           gh release create "$TARGET_TAG" \
             linux-hp-*.pkg.tar.zst sha256sums.txt \
             --title "linux-hp ${TARGET_TAG}" \
-            --notes-file release_notes.md
+            --notes-file release_notes.md \
+            --latest

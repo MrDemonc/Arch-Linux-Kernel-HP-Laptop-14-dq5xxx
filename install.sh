@@ -127,24 +127,75 @@ option_download_release() {
     echo "$USER_REPO" > "$CONFIG_REPO_FILE"
 
     echo ">> Fetching latest release from github.com/$USER_REPO..."
-    RELEASE_API="https://api.github.com/repos/$USER_REPO/releases/latest"
-    RELEASE_DATA=$(curl -sL "$RELEASE_API")
+    RELEASE_INFO=$(python3 - "$USER_REPO" << 'EOF'
+import urllib.request, json, sys, os, subprocess
 
-    TAG_NAME=$(echo "$RELEASE_DATA" | grep -o '"tag_name": "[^"]*"' | head -n1 | cut -d'"' -f4)
-    if [ -z "$TAG_NAME" ]; then
-        echo "❌ Error: No release found at https://github.com/$USER_REPO/releases"
-        echo "Please make sure to publish a release with .pkg.tar.zst assets attached."
+repo = sys.argv[1]
+token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+if not token:
+    try:
+        token = subprocess.check_output(["gh", "auth", "token"], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        token = ""
+
+headers = {
+    "User-Agent": "linux-hp-installer",
+    "Accept": "application/vnd.github+json",
+    "Cache-Control": "no-cache"
+}
+if token:
+    headers["Authorization"] = f"token {token}"
+
+def get_json(endpoint):
+    url = f"https://api.github.com/repos/{repo}/{endpoint}"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            return json.load(resp)
+    except Exception:
+        return None
+
+# 1. Primary: Query GitHub latest release endpoint
+data = get_json("releases/latest")
+assets = []
+if data and isinstance(data, dict):
+    assets = [a["browser_download_url"] for a in data.get("assets", []) if a.get("browser_download_url", "").endswith(".pkg.tar.zst")]
+
+# 2. Fallback: Query releases list in case latest is not tagged or is a pre-release
+if not assets:
+    releases = get_json("releases?per_page=10")
+    if releases and isinstance(releases, list):
+        for rel in releases:
+            rel_assets = [a["browser_download_url"] for a in rel.get("assets", []) if a.get("browser_download_url", "").endswith(".pkg.tar.zst")]
+            if rel_assets:
+                data = rel
+                assets = rel_assets
+                break
+
+if not data or not assets:
+    sys.exit(1)
+
+tag = data.get("tag_name", "")
+title = data.get("name", "") or tag
+published = data.get("published_at", "")
+print(f"{tag}\t{title}\t{published}\t{' '.join(assets)}")
+EOF
+)
+
+    if [ -z "$RELEASE_INFO" ]; then
+        echo "❌ Error: Could not find any valid release with .pkg.tar.zst packages in $USER_REPO."
+        echo "Please verify https://github.com/$USER_REPO/releases"
         exit 1
     fi
 
-    echo ">> Found Release: $TAG_NAME"
-    
-    # Extract asset URLs ending in .pkg.tar.zst
-    ASSET_URLS=($(echo "$RELEASE_DATA" | grep -o '"browser_download_url": "[^"]*\.pkg\.tar\.zst"' | cut -d'"' -f4))
+    IFS=$'\t' read -r TAG_NAME RELEASE_TITLE PUBLISHED_DATE ASSETS_RAW <<< "$RELEASE_INFO"
+    IFS=' ' read -r -a ASSET_URLS <<< "$ASSETS_RAW"
 
-    if [ ${#ASSET_URLS[@]} -eq 0 ]; then
-        echo "❌ Error: Release $TAG_NAME does not contain any .pkg.tar.zst packages."
-        exit 1
+    echo ">> Found Release: $TAG_NAME ($RELEASE_TITLE)"
+    [ -n "$PUBLISHED_DATE" ] && echo "   Published at: $PUBLISHED_DATE"
+    INSTALLED_VER=$(pacman -Q linux-hp 2>/dev/null || true)
+    if [ -n "$INSTALLED_VER" ]; then
+        echo "   Currently installed: $INSTALLED_VER"
     fi
 
     mkdir -p "$SCRIPT_DIR/downloads"
@@ -159,7 +210,7 @@ option_download_release() {
 
     echo ""
     echo ">> Installing downloaded packages with pacman..."
-    sudo pacman -U --needed ./*.pkg.tar.zst
+    sudo pacman -U ./*.pkg.tar.zst
     cd "$SCRIPT_DIR"
 
     # Set up background update notifier
