@@ -1,0 +1,246 @@
+name: Build and Release Kernel
+
+on:
+  schedule:
+    # Check for new Arch Linux kernel releases daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force compilation and release even if this version already exists'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+    paths:
+      - 'PKGBUILD'
+      - 'config.x86_64'
+      - 'hp-modules.list'
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-build:
+    name: Check Updates, Compile and Release
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure safe git directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base-devel \
+            git \
+            bc \
+            pahole \
+            python \
+            zstd \
+            tar \
+            xz \
+            curl \
+            github-cli \
+            sudo
+
+      - name: Check upstream Arch Linux kernel and determine release tag
+        id: check_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_BUILD: ${{ inputs.force_build }}
+        run: |
+          # Fetch official Arch packaging repository
+          git fetch https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git main || true
+          UPSTREAM_HASH=$(git rev-parse FETCH_HEAD 2>/dev/null || echo "")
+          
+          CURRENT_VER=$(grep -E '^pkgver=' PKGBUILD | cut -d= -f2)
+          CURRENT_REL=$(grep -E '^pkgrel=' PKGBUILD | cut -d= -f2)
+          
+          if [ -n "$UPSTREAM_HASH" ]; then
+            UPSTREAM_VER=$(git show "$UPSTREAM_HASH:PKGBUILD" 2>/dev/null | grep -E '^pkgver=' | cut -d= -f2 || echo "$CURRENT_VER")
+            UPSTREAM_REL=$(git show "$UPSTREAM_HASH:PKGBUILD" 2>/dev/null | grep -E '^pkgrel=' | cut -d= -f2 || echo "$CURRENT_REL")
+          else
+            UPSTREAM_VER="$CURRENT_VER"
+            UPSTREAM_REL="$CURRENT_REL"
+          fi
+          
+          TARGET_TAG="v${UPSTREAM_VER}-${UPSTREAM_REL}"
+          echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+          echo "upstream_ver=$UPSTREAM_VER" >> "$GITHUB_OUTPUT"
+          echo "upstream_rel=$UPSTREAM_REL" >> "$GITHUB_OUTPUT"
+          echo "upstream_hash=$UPSTREAM_HASH" >> "$GITHUB_OUTPUT"
+
+          # Check if this release already exists on GitHub
+          if gh release view "$TARGET_TAG" &>/dev/null && [ "$FORCE_BUILD" != "true" ]; then
+            echo "Release $TARGET_TAG already exists and force_build is not set. Skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release $TARGET_TAG does not exist or force_build is true. Proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update sources and apply optimizations
+        if: steps.check_version.outputs.should_build == 'true'
+        run: |
+          UPSTREAM_HASH="${{ steps.check_version.outputs.upstream_hash }}"
+          CURRENT_VER=$(grep -E '^pkgver=' PKGBUILD | cut -d= -f2)
+          UPSTREAM_VER="${{ steps.check_version.outputs.upstream_ver }}"
+          
+          if [ -n "$UPSTREAM_HASH" ] && [ "$CURRENT_VER" != "$UPSTREAM_VER" ]; then
+            echo "Updating PKGBUILD and config.x86_64 to upstream $UPSTREAM_VER..."
+            git checkout "$UPSTREAM_HASH" -- PKGBUILD config.x86_64
+          fi
+
+          # Apply HP Laptop & Alder Lake optimizations
+          python3 - << 'EOF'
+import os, re, subprocess
+config_path = "config.x86_64"
+pkgbuild_path = "PKGBUILD"
+
+# Optimize config.x86_64
+with open(config_path, "r", encoding="utf-8") as f:
+    content = f.read()
+
+replacements = {
+    "# CONFIG_X86_NATIVE_CPU is not set": "CONFIG_X86_NATIVE_CPU=y",
+    "CONFIG_CPU_SUP_AMD=y": "# CONFIG_CPU_SUP_AMD is not set",
+    "CONFIG_CPU_SUP_HYGON=y": "# CONFIG_CPU_SUP_HYGON is not set",
+    "CONFIG_CPU_SUP_CENTAUR=y": "# CONFIG_CPU_SUP_CENTAUR is not set",
+    "CONFIG_CPU_SUP_ZHAOXIN=y": "# CONFIG_CPU_SUP_ZHAOXIN is not set",
+    "CONFIG_HZ_1000=y": "# CONFIG_HZ_1000 is not set\nCONFIG_HZ_300=y",
+    "CONFIG_HZ=1000": "CONFIG_HZ=300",
+    "CONFIG_PCIEASPM_DEFAULT=y": "# CONFIG_PCIEASPM_DEFAULT is not set\nCONFIG_PCIEASPM_POWER_SUPERSAVE=y",
+    "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=10": "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1",
+    "CONFIG_RUST=y": "# CONFIG_RUST is not set",
+}
+for target, rep in replacements.items():
+    content = content.replace(target, rep)
+
+lines = [l for l in content.splitlines() if l.strip() not in ["# CONFIG_HZ_300 is not set", "# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set"]]
+with open(config_path, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+
+# Optimize PKGBUILD
+with open(pkgbuild_path, "r", encoding="utf-8") as f:
+    c = f.read()
+
+c = re.sub(r"^pkgbase=linux\b", "pkgbase=linux-hp", c, flags=re.MULTILINE)
+c = re.sub(r"^pkgdesc='Linux'", "pkgdesc='Linux kernel tailored and optimized for HP Laptop (Alder Lake, Battery & Power Saving)'", c, flags=re.MULTILINE)
+
+for dep in [r"\s*rust\n", r"\s*rust-bindgen\n", r"\s*rust-src\n", r"\s*graphviz\n", r"\s*imagemagick\n", r"\s*python-sphinx\n", r"\s*python-yaml\n", r"\s*texlive-latexextra\n", r"\s*# htmldocs\n"]:
+    c = re.sub(dep, "\n", c)
+
+c = re.sub(r"\.sign\}", "", c)
+c = re.sub(r"\.sig\}", "", c)
+c = re.sub(r"\.tar\.\{xz,sign\}", ".tar.xz", c)
+c = re.sub(r"\.patch\.zst\{,\.sig\}", ".patch.zst", c)
+c = re.sub(r"validpgpkeys=\([^)]*\)\n?", "", c)
+c = re.sub(r"\s*make htmldocs[^\n]*\n", "\n", c)
+c = re.sub(r"\s*local pid_docs=\$!\n", "\n", c)
+c = re.sub(r"\s*wait \$pid_docs\n", "\n", c)
+
+if "localmodconfig" not in c:
+    c = c.replace("cp ../config.$CARCH .config\n", "cp ../config.$CARCH .config\n  if [[ -f ../.use_localmodconfig || \"${USE_LOCALMODCONFIG:-0}\" == \"1\" || -n \"${CI:-}\" ]]; then\n    if [[ -f ../hp-modules.list ]]; then\n      echo \"Applying localmodconfig using hp-modules.list...\"\n      yes \"\" | make LSMOD=../hp-modules.list localmodconfig\n    else\n      echo \"Applying localmodconfig (streamlining for HP laptop hardware)...\"\n      yes \"\" | make LSMOD=<(lsmod) localmodconfig\n    fi\n  fi\n")
+
+c = re.sub(r"_package-docs\(\) \{.*?^\}\n", "", c, flags=re.DOTALL | re.MULTILINE)
+c = re.sub(r'"\$pkgbase-docs"\n?', "", c)
+c = re.sub(r"\n\s*'SKIP'", "", c)
+
+b2 = subprocess.check_output(["b2sum", config_path]).decode().split()[0]
+c = re.sub(r"b2sums_x86_64=\('[0-9a-fA-F]+'\)", f"b2sums_x86_64=('{b2}')", c)
+
+with open(pkgbuild_path, "w", encoding="utf-8") as f:
+    f.write(c)
+EOF
+
+          # Commit updated PKGBUILD & config back to repository if changed
+          if ! git diff --quiet PKGBUILD config.x86_64; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add PKGBUILD config.x86_64
+            git commit -m "chore(kernel): update to upstream ${{ steps.check_version.outputs.upstream_ver }} [skip ci]" || true
+            git push origin main || true
+          fi
+
+      - name: Build custom kernel package
+        if: steps.check_version.outputs.should_build == 'true'
+        run: |
+          # Create non-root user required by makepkg
+          useradd -m -s /bin/bash builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+          # Run compilation in CI mode (automatically uses hp-modules.list for HP laptop hardware)
+          su builder -c "CI=true MAKEFLAGS='-j$(nproc)' makepkg -s --noconfirm --force"
+
+      - name: Generate Checksums & Release Notes
+        if: steps.check_version.outputs.should_build == 'true'
+        run: |
+          TARGET_TAG="${{ steps.check_version.outputs.target_tag }}"
+          UPSTREAM_VER="${{ steps.check_version.outputs.upstream_ver }}"
+
+          sha256sum linux-hp-*.pkg.tar.zst > sha256sums.txt
+
+          cat << EOF > release_notes.md
+## 🚀 linux-hp Kernel Release: ${TARGET_TAG}
+
+Tailored Linux kernel build optimized for **HP Laptop 14-dq5xxx (Intel Core i3-1215U Alder Lake)** for maximum battery endurance, reduced thermal throttling, and quiet fan operation.
+
+### 📦 Version Information
+* **Upstream Arch Linux Kernel:** \`${UPSTREAM_VER}\`
+* **Package Base:** \`linux-hp\`
+* **Architecture:** \`x86_64\` (Optimized for 12th Gen Alder Lake)
+* **Target Laptop:** HP Laptop 14-dq5xxx
+
+### ⚡ Key Optimizations Included
+* **300 Hz Timer Frequency (\`CONFIG_HZ_300=y\`):** 70% fewer CPU wake-up interruptions compared to standard 1000 Hz, maintaining deeper package C-States (\`C10\`).
+* **Native CPU Instruction Tuning (\`CONFIG_X86_NATIVE_CPU=y\`):** Native instruction set optimization for Alder Lake Golden Cove & Gracemont cores; non-Intel CPU vendor routines removed.
+* **PCIe ASPM Supersave (\`CONFIG_PCIEASPM_POWER_SUPERSAVE=y\`):** Forces PCIe links (Realtek RTL8821CE Wi-Fi and Samsung NVMe PM9B1) into low-power states (\`L1 sub-states\`).
+* **Intel Hybrid Scheduler & Energy Model (\`CONFIG_INTEL_HFI_THERMAL=y\`):** Routes background and low-priority tasks to the 4 Efficient Cores (E-cores).
+* **Audio Codec Power-Down (\`CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1\`):** Lowers audio hardware sleep delay from 10s to 1s.
+* **Hardware-Tailored Drivers (\`localmodconfig\`):** Compiled specifically with all active hardware modules required by the HP Laptop 14-dq5xxx.
+
+### 📥 Installation Instructions
+
+#### Method 1: Using \`install.sh\` (Recommended)
+Run \`install.sh\` and select **Option 1**:
+\`\`\`bash
+./install.sh
+\`\`\`
+
+#### Method 2: Manual pacman installation
+Download the attached \`.pkg.tar.zst\` assets and install:
+\`\`\`bash
+sudo pacman -U linux-hp-*.pkg.tar.zst
+\`\`\`
+Reboot and select **\`linux-hp\`** in the Limine bootloader menu.
+EOF
+
+      - name: Publish GitHub Release
+        if: steps.check_version.outputs.should_build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET_TAG="${{ steps.check_version.outputs.target_tag }}"
+
+          # Delete existing release with same tag if force_build was triggered
+          if gh release view "$TARGET_TAG" &>/dev/null; then
+            gh release delete "$TARGET_TAG" --yes --cleanup-tag || true
+          fi
+
+          gh release create "$TARGET_TAG" \
+            linux-hp-*.pkg.tar.zst sha256sums.txt \
+            --title "linux-hp ${TARGET_TAG}" \
+            --notes-file release_notes.md

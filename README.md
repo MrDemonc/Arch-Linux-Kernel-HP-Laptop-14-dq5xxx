@@ -96,6 +96,18 @@ The interactive menu presents **3 options**:
 
 ---
 
+## 🤖 Automated CI/CD (GitHub Actions)
+
+This repository includes a fully automated GitHub Actions workflow ([`.github/workflows/build-kernel.yml`](file:///.github/workflows/build-kernel.yml)):
+
+* **Daily Upstream Check:** Runs every day at 06:00 UTC (and on manual trigger via `workflow_dispatch`).
+* **Change Detection:** Automatically checks if Arch Linux has released a newer kernel.
+* **Cloud Compilation:** Runs inside a clean `archlinux:latest` container, injects all Alder Lake optimizations, and builds specifically for this HP laptop using [`hp-modules.list`](file:///hp-modules.list).
+* **Automated GitHub Release:** Packages `linux-hp-*.pkg.tar.zst`, computes SHA256 checksums, writes detailed release notes, and attaches the binary assets to a new GitHub Release.
+* **Instant Installation:** Once released, you can simply run `./install.sh` and pick **Option 1** on your laptop to download and install the precompiled kernel in seconds.
+
+---
+
 ## 💡 Runtime Power Management Tips
 
 For everyday use on battery, select the balanced or power-saver profile:

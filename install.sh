@@ -72,7 +72,7 @@ if os.path.exists(pkgbuild_path):
     c = re.sub(r"\s*wait \$pid_docs\n", "\n", c)
 
     if "localmodconfig" not in c:
-        c = c.replace("cp ../config.$CARCH .config\n", "cp ../config.$CARCH .config\n  if [[ -f ../.use_localmodconfig || \"${USE_LOCALMODCONFIG:-0}\" == \"1\" ]]; then\n    echo \"Applying localmodconfig (streamlining for HP laptop hardware)...\"\n    yes \"\" | make LSMOD=<(lsmod) localmodconfig\n  fi\n")
+        c = c.replace("cp ../config.$CARCH .config\n", "cp ../config.$CARCH .config\n  if [[ -f ../.use_localmodconfig || \"${USE_LOCALMODCONFIG:-0}\" == \"1\" || -n \"${CI:-}\" ]]; then\n    if [[ -f ../hp-modules.list ]]; then\n      echo \"Applying localmodconfig using hp-modules.list...\"\n      yes \"\" | make LSMOD=../hp-modules.list localmodconfig\n    else\n      echo \"Applying localmodconfig (streamlining for HP laptop hardware)...\"\n      yes \"\" | make LSMOD=<(lsmod) localmodconfig\n    fi\n  fi\n")
 
     c = re.sub(r"_package-docs\(\) \{.*?^\}\n", "", c, flags=re.DOTALL | re.MULTILINE)
     c = re.sub(r'"\$pkgbase-docs"\n?', "", c)

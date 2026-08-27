@@ -65,9 +65,14 @@ prepare() {
 
   echo "Setting config..."
   cp ../config.$CARCH .config
-  if [[ -f ../.use_localmodconfig || "${USE_LOCALMODCONFIG:-0}" == "1" ]]; then
-    echo "Applying localmodconfig (streamlining for HP laptop hardware)..."
-    yes "" | make LSMOD=<(lsmod) localmodconfig
+  if [[ -f ../.use_localmodconfig || "${USE_LOCALMODCONFIG:-0}" == "1" || -n "${CI:-}" ]]; then
+    if [[ -f ../hp-modules.list ]]; then
+      echo "Applying localmodconfig using hp-modules.list..."
+      yes "" | make LSMOD=../hp-modules.list localmodconfig
+    else
+      echo "Applying localmodconfig (streamlining for HP laptop hardware)..."
+      yes "" | make LSMOD=<(lsmod) localmodconfig
+    fi
   fi
   make olddefconfig
   diff -u ../config.$CARCH .config || :
