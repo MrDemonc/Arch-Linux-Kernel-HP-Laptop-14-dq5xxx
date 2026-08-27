@@ -31,15 +31,6 @@ jobs:
       options: --privileged
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure safe git directory
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
       - name: Install build dependencies
         run: |
           pacman -Syu --noconfirm --needed \
@@ -54,6 +45,15 @@ jobs:
             curl \
             github-cli \
             sudo
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure safe git directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Check upstream Arch Linux kernel and determine release tag
         id: check_version
