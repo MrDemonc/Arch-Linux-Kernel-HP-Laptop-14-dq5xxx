@@ -14,6 +14,10 @@ Tailored Linux kernel build optimized for **HP Laptop 14-dq5xxx (Intel Core i3-1
 * **PCIe ASPM Supersave (`CONFIG_PCIEASPM_POWER_SUPERSAVE=y`):** Forces PCIe links (Realtek RTL8821CE Wi-Fi and Samsung NVMe PM9B1) into low-power states (`L1 sub-states`).
 * **Intel Hybrid Scheduler & Energy Model (`CONFIG_INTEL_HFI_THERMAL=y`):** Routes background and low-priority tasks to the 4 Efficient Cores (E-cores).
 * **Audio Codec Power-Down (`CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1`):** Lowers audio hardware sleep delay from 10s to 1s.
+* **Low-Latency TCP BBRv3 (`CONFIG_TCP_CONG_BBR=y`, default `bbr`):** Faster network throughput and reduced ping/jitter in online games.
+* **Transparent Huge Pages on Madvise (`CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y`):** Eliminates `kcompactd` stuttering while enabling 2MB huge pages for Wine/Proton games.
+* **Windows NT Fast Synchronization (`NTSYNC` module):** Kernel-level acceleration for multi-threaded DirectX 11/12 games via Steam Proton.
+* **Sched-EXT Support (`CONFIG_SCHED_CLASS_EXT=y`):** Enables dynamic extensible BPF schedulers (like `scx_lavd` for gaming).
 * **Hardware-Tailored Drivers (`localmodconfig`):** Compiled specifically with all active hardware modules required by the HP Laptop 14-dq5xxx.
 
 ### 📥 Installation Instructions

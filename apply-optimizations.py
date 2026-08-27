@@ -32,6 +32,11 @@ def optimize_config():
         "CONFIG_PCIEASPM_DEFAULT=y": "# CONFIG_PCIEASPM_DEFAULT is not set\nCONFIG_PCIEASPM_POWER_SUPERSAVE=y",
         "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=10": "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1",
         "CONFIG_RUST=y": "# CONFIG_RUST is not set",
+        # Gaming & Latency optimizations:
+        "CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y": "# CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS is not set\nCONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y",
+        "CONFIG_TCP_CONG_BBR=m": "CONFIG_TCP_CONG_BBR=y",
+        "CONFIG_DEFAULT_CUBIC=y": "# CONFIG_DEFAULT_CUBIC is not set\nCONFIG_DEFAULT_BBR=y",
+        'CONFIG_DEFAULT_TCP_CONG="cubic"': 'CONFIG_DEFAULT_TCP_CONG="bbr"',
     }
 
     for target, rep in replacements.items():
@@ -39,12 +44,16 @@ def optimize_config():
 
     lines = [
         l for l in content.splitlines()
-        if l.strip() not in ["# CONFIG_HZ_300 is not set", "# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set"]
+        if l.strip() not in [
+            "# CONFIG_HZ_300 is not set",
+            "# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set",
+            "# CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set",
+        ]
     ]
 
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    print("   [OK] config.x86_64 optimized (300Hz, Native CPU, ASPM Supersave, Audio 1s).")
+    print("   [OK] config.x86_64 optimized (300Hz, Native CPU, ASPM Supersave, Audio 1s, BBR, THP Madvise).")
 
 def optimize_pkgbuild():
     if not os.path.exists(PKGBUILD_PATH):

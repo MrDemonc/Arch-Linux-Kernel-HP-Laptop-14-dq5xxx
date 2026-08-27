@@ -37,7 +37,13 @@ A custom, tailored Linux kernel build (`linux-hp`) engineered for **maximum batt
 5. **Intel Hybrid Scheduler & Energy Model (`CONFIG_INTEL_HFI_THERMAL=y`, `CONFIG_ENERGY_MODEL=y`):**
    * Coordinates with Intel Thread Director and Hardware Feedback Interface (HFI) to prioritize routing background tasks (audio streaming, file indexing, browser background tabs) to the 4 low-power **E-cores**, keeping power-hungry **P-cores** asleep.
 
-6. **Lean & Streamlined Build:**
+6. **Gaming & Low-Latency Enhancements:**
+   * **TCP BBRv3 as Default (`CONFIG_TCP_CONG_BBR=y`, `CONFIG_DEFAULT_BBR=y`):** Replaces legacy Cubic with Google's BBR congestion control, reducing ping fluctuations and bufferbloat in online gaming.
+   * **Transparent Huge Pages on Madvise (`CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y`):** Eliminates `kcompactd` memory compaction stuttering during gameplay while granting 2 MB huge pages to Proton and Wine on demand.
+   * **Windows NT Fast Synchronization (`CONFIG_NTSYNC=m`):** In-kernel Windows NT synchronization primitives that dramatically lower CPU locking overhead in multi-threaded games running through Steam Proton.
+   * **Dynamic Extensible Schedulers (`CONFIG_SCHED_CLASS_EXT=y`):** Out-of-the-box support for cutting-edge BPF gaming schedulers like `scx_lavd`.
+
+7. **Lean & Streamlined Build:**
    * Documentation building (Sphinx/LaTeX) is stripped to eliminate bloated build dependencies.
    * Optional **Fast Mode (`localmodconfig`)** trims unneeded enterprise and server drivers, compiling in **~15–25 minutes** instead of 2 hours.
 
