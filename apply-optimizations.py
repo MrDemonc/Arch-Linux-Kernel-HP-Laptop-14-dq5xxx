@@ -56,7 +56,7 @@ def optimize_pkgbuild():
         c = f.read()
 
     # Set package base & description
-    c = re.sub(r"^pkgbase=linux$", "pkgbase=linux-hp", c, flags=re.MULTILINE)
+    c = re.sub(r"^pkgbase=linux.*$", "pkgbase=linux-hp", c, flags=re.MULTILINE)
     c = re.sub(
         r"^pkgdesc='Linux'",
         "pkgdesc='Linux kernel tailored and optimized for HP Laptop (Alder Lake, Battery & Power Saving)'",
