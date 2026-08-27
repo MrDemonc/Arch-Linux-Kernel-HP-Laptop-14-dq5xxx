@@ -56,7 +56,7 @@ def optimize_pkgbuild():
         c = f.read()
 
     # Set package base & description
-    c = re.sub(r"^pkgbase=linux\b", "pkgbase=linux-hp", c, flags=re.MULTILINE)
+    c = re.sub(r"^pkgbase=linux$", "pkgbase=linux-hp", c, flags=re.MULTILINE)
     c = re.sub(
         r"^pkgdesc='Linux'",
         "pkgdesc='Linux kernel tailored and optimized for HP Laptop (Alder Lake, Battery & Power Saving)'",
@@ -84,19 +84,23 @@ def optimize_pkgbuild():
     c = re.sub(r"\s*local pid_docs=\$!\n", "\n", c)
     c = re.sub(r"\s*wait \$pid_docs\n", "\n", c)
 
-    # Add localmodconfig support using hp-modules.list
+    # Add localmodconfig support using hp-modules.list or temp file
     if "localmodconfig" not in c:
         c = c.replace(
             "cp ../config.$CARCH .config\n",
             "cp ../config.$CARCH .config\n"
             "  if [[ -f ../.use_localmodconfig || \"${USE_LOCALMODCONFIG:-0}\" == \"1\" || -n \"${CI:-}\" ]]; then\n"
-            "    if [[ -f ../hp-modules.list ]]; then\n"
-            "      echo \"Applying localmodconfig using hp-modules.list...\"\n"
-            "      yes \"\" | make LSMOD=../hp-modules.list localmodconfig\n"
-            "    else\n"
-            "      echo \"Applying localmodconfig (streamlining for HP laptop hardware)...\"\n"
-            "      yes \"\" | make LSMOD=<(lsmod) localmodconfig\n"
+            "    local _modfile=\"${startdir:-..}/hp-modules.list\"\n"
+            "    if [[ ! -f \"$_modfile\" ]]; then\n"
+            "      _modfile=\"../hp-modules.list\"\n"
             "    fi\n"
+            "    if [[ ! -f \"$_modfile\" ]]; then\n"
+            "      _modfile=\"$(mktemp /tmp/lsmod.XXXXXX)\"\n"
+            "      lsmod > \"$_modfile\" 2>/dev/null || true\n"
+            "    fi\n"
+            "    echo \"Applying localmodconfig using $_modfile...\"\n"
+            "    yes \"\" | make LSMOD=\"$_modfile\" localmodconfig\n"
+            "    [[ \"$_modfile\" == /tmp/* ]] && rm -f \"$_modfile\"\n"
             "  fi\n"
         )
 
