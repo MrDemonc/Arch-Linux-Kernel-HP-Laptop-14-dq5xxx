@@ -64,7 +64,7 @@ def optimize_pkgbuild():
     with open(PKGBUILD_PATH, "r", encoding="utf-8") as f:
         c = f.read()
 
-    # Set package base & description
+    # 1. Set package base & description
     c = re.sub(r"^pkgbase=linux.*$", "pkgbase=linux-hp", c, flags=re.MULTILINE)
     c = re.sub(
         r"^pkgdesc='Linux'",
@@ -73,7 +73,7 @@ def optimize_pkgbuild():
         flags=re.MULTILINE
     )
 
-    # Remove docs and rust makedepends
+    # 2. Remove docs and rust makedepends
     for dep in [
         r"\s*rust\n", r"\s*rust-bindgen\n", r"\s*rust-src\n",
         r"\s*graphviz\n", r"\s*imagemagick\n", r"\s*python-sphinx\n",
@@ -81,19 +81,48 @@ def optimize_pkgbuild():
     ]:
         c = re.sub(dep, "\n", c)
 
-    # Remove signature requirements
-    c = re.sub(r"\.sign\}", "", c)
-    c = re.sub(r"\.sig\}", "", c)
+    # 3. Clean signature files from source array
     c = re.sub(r"\.tar\.\{xz,sign\}", ".tar.xz", c)
     c = re.sub(r"\.patch\.zst\{,\.sig\}", ".patch.zst", c)
-    c = re.sub(r"validpgpkeys=\([^)]*\)\n?", "", c)
+    c = re.sub(r"\n\s*.*?\.(?:sign|sig)\n?", "\n", c)
 
-    # Remove htmldocs building
+    # 4. Remove validpgpkeys and sha256sums arrays cleanly line-by-line
+    # This avoids regex pitfalls with comments containing parens like '# Jan Alexander Steffens (heftig)'
+    lines = c.splitlines(keepends=True)
+    new_lines = []
+    skip_array = None
+    for line in lines:
+        if skip_array is None:
+            m = re.match(r"^\s*(validpgpkeys|sha256sums)=\(", line)
+            if m:
+                skip_array = m.group(1)
+                code_part = line.split("#")[0]
+                if ")" in code_part.split("=", 1)[1]:
+                    skip_array = None
+                continue
+            if line.strip().startswith("# https://www.kernel.org/pub/linux/kernel/"):
+                continue
+            new_lines.append(line)
+        else:
+            code_part = line.split("#")[0]
+            if ")" in code_part:
+                skip_array = None
+
+    c = "".join(new_lines)
+
+    # 5. Format b2sums array to only include actual file hashes (drop SKIPs)
+    m = re.search(r"b2sums=\((.*?)\)", c, flags=re.DOTALL)
+    if m:
+        hashes = re.findall(r"'([0-9a-fA-F]{128})'", m.group(1))
+        formatted_b2sums = "b2sums=(\n" + "\n".join(f"  '{h}'" for h in hashes) + "\n)"
+        c = c[:m.start()] + formatted_b2sums + c[m.end():]
+
+    # 6. Remove htmldocs building
     c = re.sub(r"\s*make htmldocs[^\n]*\n", "\n", c)
     c = re.sub(r"\s*local pid_docs=\$!\n", "\n", c)
     c = re.sub(r"\s*wait \$pid_docs\n", "\n", c)
 
-    # Add localmodconfig support using hp-modules.list or temp file
+    # 7. Add localmodconfig support using hp-modules.list or temp file
     if "localmodconfig" not in c:
         c = c.replace(
             "cp ../config.$CARCH .config\n",
@@ -113,12 +142,11 @@ def optimize_pkgbuild():
             "  fi\n"
         )
 
-    # Remove docs package definition
-    c = re.sub(r"_package-docs\(\) \{.*?^\}\n", "", c, flags=re.DOTALL | re.MULTILINE)
-    c = re.sub(r'"\$pkgbase-docs"\n?', "", c)
-    c = re.sub(r"\n\s*'SKIP'", "", c)
+    # 8. Remove docs package definition
+    c = re.sub(r"^_package-docs\(\) \{.*?^\}\n", "", c, flags=re.DOTALL | re.MULTILINE)
+    c = re.sub(r"^\s*\"\$pkgbase-docs\"\n?", "", c, flags=re.MULTILINE)
 
-    # Recalculate b2sum for config.x86_64
+    # 9. Recalculate b2sum for config.x86_64
     b2 = subprocess.check_output(["b2sum", CONFIG_PATH]).decode().split()[0]
     c = re.sub(r"b2sums_x86_64=\('[0-9a-fA-F]+'\)", f"b2sums_x86_64=('{b2}')", c)
 

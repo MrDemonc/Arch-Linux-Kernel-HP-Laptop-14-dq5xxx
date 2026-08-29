@@ -35,17 +35,15 @@ _srcname=linux-${pkgver%.*}
 _srctag=v${pkgver%.*}-${pkgver##*.}
 source=(
   https://cdn.kernel.org/pub/linux/kernel/v${pkgver%%.*}.x/${_srcname}.tar.xz
-  $url/releases/download/$_srctag/linux-$_srctag.patch.zst{,
+  $url/releases/download/$_srctag/linux-$_srctag.patch.zst
 )
 source_x86_64=(config.x86_64)
+b2sums=(
+  '7d3904933ddca054bc085d34c2941d0ed74280c3691716b55369197a0f40dad8d116abaca22fcea71476bd52e9396d80d066d3e859bc945dfdb9e305baff59ab'
+  '3953137079a786967230b6f5f2b4ccaa7cb5a2b09ef533ea5b9b8ca83fa4d8795a2fd8430bb5fc1dd280396571685e3fa06fe6aaa4fc64ad9484008457218713'
 )
-b2sums=('7d3904933ddca054bc085d34c2941d0ed74280c3691716b55369197a0f40dad8d116abaca22fcea71476bd52e9396d80d066d3e859bc945dfdb9e305baff59ab'
-        '3953137079a786967230b6f5f2b4ccaa7cb5a2b09ef533ea5b9b8ca83fa4d8795a2fd8430bb5fc1dd280396571685e3fa06fe6aaa4fc64ad9484008457218713')
 b2sums_x86_64=('4a62d4924ad9ef94ec70a23022f5f8d12424c17b549d80de03e430affd69fdc1f2ded8868119b1ec5a82ea714608e4432664deb71a94b57ae7dc086b1283d385')
 
-# https://www.kernel.org/pub/linux/kernel/v7.x/sha256sums.asc
-sha256sums=('7d0e7ce14f98c43efe880cffbf354a59be45928fdf7170d7333c374ae91c0d83'
-            'e8f3e197bd64985922150873c4af09301088a7437217f519243ce74ba6a691f4')
 
 export KBUILD_BUILD_HOST=archlinux
 export KBUILD_BUILD_USER=$pkgbase
@@ -256,7 +254,7 @@ _package-headers() {
 pkgname=(
   "$pkgbase"
   "$pkgbase-headers"
-  )
+)
 for _p in "${pkgname[@]}"; do
   eval "package_$_p() {
     $(declare -f "_package${_p#$pkgbase}")
