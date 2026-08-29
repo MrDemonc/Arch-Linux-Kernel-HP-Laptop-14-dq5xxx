@@ -197,3 +197,7 @@ uas 16384 0
 exfat 16384 0
 ntfs3 16384 0
 overlay 16384 0
+dm_integrity 16384 0
+dm_bufio 16384 0
+async_xor 16384 0
+

@@ -18,6 +18,7 @@ on:
       - 'PKGBUILD'
       - 'config.x86_64'
       - 'hp-modules.list'
+      - '.github/workflows/build-kernel.yml'
 
 permissions:
   contents: write
@@ -80,6 +81,10 @@ jobs:
           echo "upstream_ver=$UPSTREAM_VER" >> "$GITHUB_OUTPUT"
           echo "upstream_rel=$UPSTREAM_REL" >> "$GITHUB_OUTPUT"
           echo "upstream_hash=$UPSTREAM_HASH" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            FORCE_BUILD="true"
+          fi
 
           if gh release view "$TARGET_TAG" &>/dev/null && [ "$FORCE_BUILD" != "true" ]; then
             echo "Release $TARGET_TAG already exists and force_build is not set. Skipping build."
