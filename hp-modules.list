@@ -200,4 +200,22 @@ overlay 16384 0
 dm_integrity 16384 0
 dm_bufio 16384 0
 async_xor 16384 0
+bridge 16384 0
+stp 16384 1 bridge
+llc 16384 2 bridge,stp
+tun 16384 0
+tap 16384 0
+macvtap 16384 0
+macvlan 16384 1 macvtap
+vhost_net 16384 0
+vhost 16384 1 vhost_net
+vhost_iotlb 16384 1 vhost
+br_netfilter 16384 0
+nf_nat 16384 0
+ebtables 16384 0
+ebtable_filter 16384 0
+ebtable_nat 16384 0
+ebt_snat 16384 0
+ebt_dnat 16384 0
+ebt_broute 16384 0
 
