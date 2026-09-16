@@ -59,7 +59,7 @@ A custom, tailored Linux kernel build (`linux-hp`) engineered for **maximum batt
 
 ### How to rollback if needed?
 1. Reboot the laptop.
-2. In the Limine bootloader menu, use the arrow keys to select **Omarchy (linux)**.
+2. In the Limine bootloader menu, use the arrow keys to select **Arch Linux** (or your original kernel).
 3. Your system boots immediately with the standard kernel.
 4. To remove the custom kernel at any time:
    ```bash
@@ -70,25 +70,26 @@ A custom, tailored Linux kernel build (`linux-hp`) engineered for **maximum batt
 
 ## 🚀 Unified Management: `install.sh`
 
-All tasks (downloading releases, compiling from source, updates, and notifications) are unified into a single script: [`install.sh`](file:///home/demonc/Documents/Proyects/kernel-test/linux-hp/install.sh).
+All tasks (downloading releases, compiling from source, updates, notifications, and bootloader management) are unified into a single script: [`install.sh`](file:///home/demonc/Documentos/github/Arch-Linux-Kernel-HP-Laptop-14-dq5xxx/install.sh).
 
 ```bash
-cd /home/demonc/Documents/Proyects/kernel-test/linux-hp
+cd /home/demonc/Documentos/github/Arch-Linux-Kernel-HP-Laptop-14-dq5xxx
 ./install.sh
 ```
 
-The interactive menu presents **3 options**:
+The interactive menu presents **4 options**:
 
 ### 1️⃣ Download precompiled kernel and install (GitHub Releases)
 * Quickly install without spending time or battery compiling.
 * Automatically queries the **Releases** section of your GitHub repository, downloads the latest `.pkg.tar.zst` packages, and installs them with `pacman`.
+* Registers `linux-hp` in Limine as the default boot entry and synchronizes configurations.
 * Automatically sets up the background update notifier.
 
 ### 2️⃣ Compile from source (Latest upstream version)
 * Checks for newly released kernel versions from official Arch Linux upstream.
 * Automatically updates the source tree and re-applies all Alder Lake and battery optimizations.
 * Lets you choose between **Fast Mode** (~15 min with `localmodconfig`) or **Full Mode**.
-* Installs the generated packages and enables the background update notifier.
+* Installs the generated packages, configures Limine as default, and enables the background update notifier.
 
 ### 3️⃣ Configure background update notifications
 * Configures a lightweight `systemd` user timer (`~/.config/systemd/user/check-kernel-update.timer`).
@@ -99,6 +100,12 @@ The interactive menu presents **3 options**:
   * **Test** sending an instant desktop notification.
   * **Disable** the timer temporarily.
   * **Completely remove** all notifier scripts, systemd units, and state files from your system.
+
+### 4️⃣ Reconfigure Limine bootloader (set linux-hp as default)
+* Automatically discovers and inspects all Limine configuration files on the system (`/boot/limine.conf`, `/boot/limine/limine.conf`, `/boot/EFI/BOOT/limine.conf`).
+* Registers `linux-hp` as the primary (first) entry and sets `default_entry: 1`.
+* Synchronizes all config copies so UEFI Limine boots it seamlessly.
+* Installs an automatic libalpm pacman hook (`/etc/pacman.d/hooks/99-limine-linux-hp.hook`) to keep Limine updated on future kernel package upgrades.
 
 ---
 

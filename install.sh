@@ -20,14 +20,14 @@ apply_optimizations() {
 }
 
 # ------------------------------------------------------------------------------
-# Function: Ensure linux-hp is the default/first boot entry in Limine
+# Function: Prepare Limine default boot order for limine-entry-tool (Omarchy/etc.)
 # ------------------------------------------------------------------------------
-configure_limine_boot_order() {
+prepare_limine_defaults() {
     local limine_default="/etc/default/limine"
     local limine_conf="/etc/limine-entry-tool.conf"
 
     if [ -f "$limine_default" ] || [ -f "$limine_conf" ] || command -v limine-entry-tool &>/dev/null; then
-        echo ">> Configuring Limine to set linux-hp as primary/default boot option..."
+        echo ">> Configuring Limine entry tool defaults (BOOT_ORDER)..."
         
         if [ ! -f "$limine_default" ]; then
             if [ -f "$limine_conf" ]; then
@@ -44,8 +44,59 @@ configure_limine_boot_order() {
         else
             echo -e '\n# Prioritize linux-hp as the default first boot entry\nBOOT_ORDER="*linux-hp*, *, *fallback, Snapshots"' | sudo tee -a "$limine_default" >/dev/null
         fi
-        echo "✅ Limine configured: linux-hp will be the primary boot entry."
     fi
+}
+
+# ------------------------------------------------------------------------------
+# Function: Configure Limine bootloader entries and synchronize configs
+# ------------------------------------------------------------------------------
+configure_limine_bootloader() {
+    echo ">> Configuring Limine to set linux-hp as primary/default boot option..."
+    
+    # 1. Update /etc/default/limine if limine-entry-tool is used
+    prepare_limine_defaults
+
+    # 2. Run limine-entry-tool if available
+    if command -v limine-entry-tool &>/dev/null; then
+        echo ">> Executing limine-entry-tool..."
+        sudo limine-entry-tool &>/dev/null || true
+    fi
+
+    # 3. Direct limine.conf configuration and synchronization
+    # Native Limine support for vanilla/custom Arch without requiring limine-entry-tool
+    if [ -f "$SCRIPT_DIR/update-limine.py" ]; then
+        sudo python3 "$SCRIPT_DIR/update-limine.py"
+    fi
+
+    # 4. Install automatic pacman hook and helper so future updates stay in sync
+    echo ">> Setting up automatic Limine pacman hook for linux-hp..."
+    sudo mkdir -p /usr/local/bin
+    sudo cp "$SCRIPT_DIR/update-limine.py" /usr/local/bin/update-limine-linux-hp
+    sudo chmod +x /usr/local/bin/update-limine-linux-hp
+
+    sudo mkdir -p /etc/pacman.d/hooks
+    sudo tee /etc/pacman.d/hooks/99-limine-linux-hp.hook >/dev/null << 'EOF'
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = linux-hp
+
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Description = Updating Limine bootloader entries for linux-hp...
+When = PostTransaction
+Exec = /usr/local/bin/update-limine-linux-hp
+EOF
+
+    echo "✅ Limine configured: linux-hp is registered and set as primary boot entry."
 }
 
 # ------------------------------------------------------------------------------
@@ -238,11 +289,15 @@ EOF
     done
 
     echo ""
-    configure_limine_boot_order
+    prepare_limine_defaults
     echo ""
     echo ">> Installing downloaded packages with pacman..."
     sudo pacman -U ./*.pkg.tar.zst
     cd "$SCRIPT_DIR"
+
+    # Configure Limine bootloader entries & synchronization
+    echo ""
+    configure_limine_bootloader
 
     # Set up background update notifier
     setup_background_notifier
@@ -338,15 +393,21 @@ option_compile_source() {
 
     if [[ "$INSTALL_NOW" =~ ^[Yy]$ ]]; then
         echo ""
-        configure_limine_boot_order
+        prepare_limine_defaults
         sudo pacman -U linux-hp-*.pkg.tar.zst
+        echo ""
+        configure_limine_bootloader
         setup_background_notifier
         echo ""
-        echo "linux-hp is configured as the primary boot option in Limine."
-        echo "Reboot your laptop ('reboot') to boot into the new kernel automatically."
+        echo "============================================================"
+        echo "  ✅ INSTALLATION COMPLETED SUCCESSFULLY"
+        echo "  linux-hp is configured as the primary boot option in Limine."
+        echo "  Reboot your laptop ('reboot') to boot into the new kernel automatically."
+        echo "============================================================"
     else
         echo "You can install the packages manually whenever you want using:"
         echo "   sudo pacman -U linux-hp-*.pkg.tar.zst"
+        echo "After installing, reconfigure Limine by running: ./install.sh (Option 4)"
     fi
 }
 
@@ -420,8 +481,9 @@ echo ""
 echo "  1) Download precompiled kernel and install (GitHub Releases)"
 echo "  2) Compile from source (latest optimized version)"
 echo "  3) Configure background update notifications"
+echo "  4) Reconfigure Limine bootloader (set linux-hp as default)"
 echo ""
-read -rp "Select an option [1, 2, or 3]: " MAIN_CHOICE
+read -rp "Select an option [1-4]: " MAIN_CHOICE
 
 case "$MAIN_CHOICE" in
     1)
@@ -432,6 +494,9 @@ case "$MAIN_CHOICE" in
         ;;
     3)
         option_manage_notifier
+        ;;
+    4)
+        configure_limine_bootloader
         ;;
     *)
         echo "Invalid option. Please run ./install.sh again."
