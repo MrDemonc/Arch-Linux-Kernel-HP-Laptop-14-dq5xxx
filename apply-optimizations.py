@@ -22,14 +22,10 @@ def optimize_config():
         content = f.read()
 
     replacements = {
-        "# CONFIG_X86_NATIVE_CPU is not set": "CONFIG_X86_NATIVE_CPU=y",
         "CONFIG_CPU_SUP_AMD=y": "# CONFIG_CPU_SUP_AMD is not set",
         "CONFIG_CPU_SUP_HYGON=y": "# CONFIG_CPU_SUP_HYGON is not set",
         "CONFIG_CPU_SUP_CENTAUR=y": "# CONFIG_CPU_SUP_CENTAUR is not set",
         "CONFIG_CPU_SUP_ZHAOXIN=y": "# CONFIG_CPU_SUP_ZHAOXIN is not set",
-        "CONFIG_HZ_1000=y": "# CONFIG_HZ_1000 is not set\nCONFIG_HZ_300=y",
-        "CONFIG_HZ=1000": "CONFIG_HZ=300",
-        "CONFIG_PCIEASPM_DEFAULT=y": "# CONFIG_PCIEASPM_DEFAULT is not set\nCONFIG_PCIEASPM_POWER_SUPERSAVE=y",
         "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=10": "CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1",
         "CONFIG_RUST=y": "# CONFIG_RUST is not set",
         # Gaming & Latency optimizations:
@@ -45,15 +41,13 @@ def optimize_config():
     lines = [
         l for l in content.splitlines()
         if l.strip() not in [
-            "# CONFIG_HZ_300 is not set",
-            "# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set",
             "# CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set",
         ]
     ]
 
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    print("   [OK] config.x86_64 optimized (300Hz, Native CPU, ASPM Supersave, Audio 1s, BBR, THP Madvise).")
+    print("   [OK] config.x86_64 optimized (Intel-only CPU, 1000Hz Thread Director, ASPM Default, Audio 1s, BBR, THP Madvise).")
 
 def optimize_pkgbuild():
     if not os.path.exists(PKGBUILD_PATH):
@@ -72,6 +66,12 @@ def optimize_pkgbuild():
         c,
         flags=re.MULTILINE
     )
+    if "export KCFLAGS=" not in c:
+        c = re.sub(
+            r"(export KBUILD_BUILD_HOST=archlinux\n)",
+            "\\1export KCFLAGS=\"-march=alderlake -O2 -pipe\"\n",
+            c
+        )
 
     # 2. Remove docs and rust makedepends
     for dep in [

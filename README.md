@@ -19,17 +19,17 @@ A custom, tailored Linux kernel build (`linux-hp`) engineered for **maximum batt
 
 ## ⚡ Applied Kernel Optimizations
 
-1. **Native CPU Microarchitecture (`CONFIG_X86_NATIVE_CPU=y`):**
-   * Emits machine code specifically compiled for the host CPU using `-march=native` instead of generic legacy x86-64 instructions.
+1. **Targeted Alder Lake Microarchitecture (`-march=alderlake`):**
+   * Compiles machine code specifically tuned for Intel 12th Gen Golden Cove (P-cores) and Gracemont (E-cores).
    * Strips out redundant CPU vendor routines for unsupported hardware (`AMD`, `Hygon`, `Centaur`, `Zhaoxin`).
    * Delivers faster cryptographic operations (LUKS encryption) and filesystem compression (Btrfs) with fewer CPU clock cycles per instruction.
 
-2. **300 Hz Timer Frequency (`CONFIG_HZ_300=y`, `CONFIG_HZ=300`):**
-   * Default Arch Linux kernels run at 1000 Hz (waking the CPU 1,000 times every second).
-   * Reducing this to **300 Hz** cuts CPU wake-up interruptions by **70%**, allowing cores to drop into ultra-deep package sleep states (**C6, C8, and C10**) for over 90% of idle time.
+2. **1000 Hz Hybrid Scheduler & Intel Thread Director (`CONFIG_HZ_1000=y`):**
+   * Rapid 1 ms timer ticks provide optimal coordination with Intel Thread Director and Hardware Feedback Interface (HFI).
+   * Ensures smooth, instant thread migration between P-cores and E-cores without scheduling stalls or deep C-state wake timeouts during heavy multithreaded compilation.
 
-3. **Aggressive PCIe ASPM (`CONFIG_PCIEASPM_POWER_SUPERSAVE=y`):**
-   * Forces PCIe buses (Realtek Wi-Fi and Samsung NVMe) into lowest-power active state links (*L1 sub-states*) whenever high-throughput I/O is idle.
+3. **Balanced PCIe ASPM Stability (`CONFIG_PCIEASPM_DEFAULT=y`):**
+   * Prevents PCIe bus desynchronization and AER errors on the Realtek RTL8821CE Wi-Fi card, while maintaining NVMe autonomous power-state transitions (APST).
 
 4. **Rapid Audio Codec Power-Down (`CONFIG_SND_HDA_POWER_SAVE_DEFAULT=1`):**
    * Suspends the Intel HD audio codec after 1 second of audio silence (compared to 10 seconds default).

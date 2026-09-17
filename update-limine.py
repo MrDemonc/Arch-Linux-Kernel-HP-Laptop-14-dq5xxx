@@ -172,6 +172,17 @@ def update_limine(remove=False, dry_run=False):
             except Exception:
                 pass
 
+        # Ensure stability parameters for Alder Lake hybrid C-states & Realtek PCIe Wi-Fi:
+        # 1. pcie_aspm=default: Prevents Realtek RTL8821CE PCIe Bus Error (AER) interrupt storms.
+        # 2. intel_idle.max_cstate=4: Prevents Alder Lake E-core deep C-state wake timeouts during MCE broadcast.
+        stability_flags = ["pcie_aspm=default", "intel_idle.max_cstate=4"]
+        cmdline_tokens = cmdline.split() if cmdline else []
+        for flag in stability_flags:
+            key = flag.split("=")[0]
+            if not any(t.startswith(key + "=") or t == key for t in cmdline_tokens):
+                cmdline_tokens.append(flag)
+        hp_cmdline = " ".join(cmdline_tokens)
+
         new_hp_entries = []
 
         # Primary entry: Arch Linux (linux-hp)
@@ -182,8 +193,8 @@ def update_limine(remove=False, dry_run=False):
         if ucode_line:
             hp_entry_lines.append(ucode_line)
         hp_entry_lines.append(f"    module_path: {path_prefix}initramfs-linux-hp.img")
-        if cmdline:
-            hp_entry_lines.append(f"    cmdline: {cmdline}")
+        if hp_cmdline:
+            hp_entry_lines.append(f"    cmdline: {hp_cmdline}")
 
         new_hp_entries.append((main_title, hp_entry_lines))
 
@@ -196,8 +207,8 @@ def update_limine(remove=False, dry_run=False):
             if ucode_line:
                 hp_fb_lines.append(ucode_line)
             hp_fb_lines.append(f"    module_path: {path_prefix}initramfs-linux-hp-fallback.img")
-            if cmdline:
-                hp_fb_lines.append(f"    cmdline: {cmdline}")
+            if hp_cmdline:
+                hp_fb_lines.append(f"    cmdline: {hp_cmdline}")
             new_hp_entries.append((fallback_title, hp_fb_lines))
 
         all_entries = new_hp_entries + filtered_entries
