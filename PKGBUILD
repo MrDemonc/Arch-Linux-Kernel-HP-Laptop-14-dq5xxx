@@ -1,7 +1,7 @@
 # Maintainer: Jan Alexander Steffens (heftig) <heftig@archlinux.org>
 
 pkgbase=linux-hp
-pkgver=7.2.8.arch1
+pkgver=7.2.9.arch1
 pkgrel=1
 pkgdesc='Linux kernel tailored and optimized for HP Laptop (Alder Lake, Battery & Power Saving)'
 url='https://github.com/archlinux/linux'
@@ -39,10 +39,10 @@ source=(
 )
 source_x86_64=(config.x86_64)
 b2sums=(
-  '5326dde778eb945f282740ef0d8765b46fbd198f1209cdfd7b91e5dac1312fc01f8bf0b2bc67b16a76de736edd8ea21b38b6c91e696ec0c4b39746cd21a15214'
-  '107774838edc0c45c3dd602ee6dddedecade6a0b5b85a02a62500d0af64c2c36ed4bcdd15e8e85df1e1a3dbc3efbe1e514f34af9ab3f251b1dcf496e633bdb2d'
+  'c853d45f0df3b713a84695c487b56e44d40da007fb48700be4bf0180c6aa15e7f087ac2d52f1cf7997b4de262aeae5094c772f36297405de1c7b8985a420328b'
+  '16446f9f4a28f4d372c03e42927637a0e13fc6d921d7535ee8cca9e059c27142980ff85ad6d7518f77008394636d3e0f6afc00251347adc8f2ef6d6939846050'
 )
-b2sums_x86_64=('bc6c6f88bf05b7e2552f8ae8dfa2f6dc787f3c98d88e4162724dfc5212bccaa7583dde67329ddd0327d78d8b13367f05a403845a19995db3d9538c2a9cc8884d')
+b2sums_x86_64=('2e1f4bd1daebe65902a063d8e8ab6ff764e2d2e211102a1d075edfb8415623b5eb218e2f2b37fd45173462cb9be268e4fc3414afb6727f393d44e27a306995ae')
 
 
 export KBUILD_BUILD_HOST=archlinux
