@@ -427,6 +427,9 @@ vmw_vsock_virtio_transport_common 16384 0
 vsock 16384 0
 vxlan 16384 0
 geneve 16384 0
+snd_usb_audio 389120 0
+snd_usbmidi_lib 45056 1 snd_usb_audio
+snd_ump 40960 1 snd_usb_audio
 
 
 
